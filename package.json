@@ -1,0 +1,29 @@
+{
+  "name": "socketchat",
+  "version": "1.0.0",
+  "description": "This is deals with Public , Private , Group chat using Node - Socket.io - Express  - MongoDB.",
+  "main": "server.js",
+  "dependencies": {
+    "express": "^4.15.2",
+    "socket.io": "^1.7.3",
+    "socket.io-stream": "^0.9.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "nodemon",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/duddukurimahesh/socket.io.git"
+  },
+  "keywords": [
+    "server"
+  ],
+  "author": "harman",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/duddukurimahesh/socket.io/issues"
+  },
+  "homepage": "https://github.com/duddukurimahesh/socket.io#readme"
+}

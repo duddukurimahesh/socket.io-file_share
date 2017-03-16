@@ -1,0 +1,308 @@
+<html>
+
+<head>
+    <title>chat with socket.io and node.js</title>
+    <style type="text/css">
+    #chat {
+        height: 500px;
+    }
+    
+    #contentWrap {
+        display: none;
+    }
+    
+    #chatWrap {
+        float: left;
+        border: 1px #000 solid;
+    }
+    
+    .error {
+        color: red;
+    }
+    
+    .whisper {
+        color: green;
+        font-style: italic;
+    }
+    
+    .userTitle {
+        color: purple;
+    }
+    </style>
+    <link rel="stylesheet" type="text/css" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+</head>
+
+<body>
+    <h2 id="userTitle" class="userTitle"></h2>
+    <div id="nickWrap">
+        <p>Enter user Name:</p>
+        <p id="nickError"></p>
+        <form id="setNick">
+            <input type="text" size="35" id="nickname"></input>
+            <input type="submit"></input>
+        </form>
+    </div>
+    <!-- <div id="theDiv">where is the image...</div> -->
+    <div id="contentWrap">
+        <div id="chatWrap">
+            <div id="chat"></div>
+            <form id="send-message">
+                <input type="text" size="35" id="message"></input>
+                <input type="submit"></input>
+            </form>
+            <input id="file" type="file" />
+        </div>
+        <div id="users"></div>
+    </div>
+    <div class="progress">
+        <div id="progress" class="progress-bar progress-bar-success" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100">
+        </div>
+    </div>
+    <img id="img" src="" height="400px;" width="400px;">
+    <script src="http://code.jquery.com/jquery-latest.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/socket.io-stream.js"></script>
+    <script type="text/javascript">
+    var preMsg = '';
+
+    function context(value) {
+        preMsg = '/w ' + value + ' ';
+        //alert(preMsg);
+    };
+    var user = '';
+    jQuery(function($) {
+
+        var socket = io.connect();
+        var $messageForm = $('#send-message');
+        var $messageBox = $('#message');
+        var $chat = $('#chat');
+        var $nickForm = $('#setNick');
+        var $nickError = $('#nickError');
+        var $nickBox = $('#nickname');
+        var $users = $('#users');
+
+        $nickForm.submit(function(e) {
+            e.preventDefault();
+            user = $nickBox.val();
+            socket.emit('new user', $nickBox.val(), function(data) {
+                if (data) {
+                    $("#userTitle").html("user : " + user);
+                    $('#nickWrap').hide();
+                    $('#contentWrap').show();
+
+
+
+                } else {
+                    $nickError.html('That username is already taken.Try again!');
+                }
+            });
+            $nickBox.val('');
+        });
+
+        socket.on('usernames', function(data) {
+            data.splice(data.indexOf(user), 1);
+            var html = '';
+            for (i = 0; i < data.length; i++) {
+                html += '<input type="radio" name="context" value="' + data[i] + '" onclick="context(value)"> ' + data[i] + '<br>';
+            }
+            $users.html(html);
+        });
+
+        $messageForm.submit(function(e) {
+            e.preventDefault();
+            socket.emit('send message', preMsg + $messageBox.val(), function(data) {
+                $chat.append('<span class="error">' + data + "</span><br/>");
+            });
+            $messageBox.val('');
+        });
+
+        /*socket.on('new message', function(data){
+        	console.log('data is ---',data);
+        	$chat.append('<span class="msg"><b>' + data.nick + ": </b>" +  data.msg + "</span><br/>");
+        });*/
+        socket.on('whisper', function(data) {
+            $chat.append('<span class="whisper"><b>' + data.nick + ": </b>" + data.msg + "</span><br/>");
+        });
+
+
+
+
+
+
+
+
+
+
+        socket.on("recieveimage", function(data) {
+            var deferred = $.Deferred();
+
+            //== Create stream for file to be streamed to and buffer to save chunks
+            var stream = ss.createStream(),
+                fileBuffer = [],
+                fileLength = 0;
+
+            //== Emit/Request
+            ss(socket).emit('filedownload', stream, data, function(fileError, fileInfo) {
+                if (fileError) {
+                    console.log(fileError);
+                    deferred.reject(fileError);
+                } else {
+
+                    console.log(['File Found!', fileInfo]);
+
+                    //== Receive data
+                    stream.on('data', function(chunk) {
+                        fileLength += chunk.length;
+                        var progress = Math.floor((fileLength / fileInfo.size) * 100);
+                        progress = Math.max(progress - 2, 1);
+                        deferred.notify(progress);
+                        fileBuffer.push(chunk);
+                    });
+
+                    stream.on('end', function() {
+
+                        var filedata = new Uint8Array(fileLength),
+                            i = 0;
+
+                        //== Loop to fill the final array
+                        fileBuffer.forEach(function(buff) {
+                            for (var j = 0; j < buff.length; j++) {
+                                filedata[i] = buff[j];
+                                i++;
+                            }
+                        });
+
+                        deferred.notify(100);
+                        
+                        var blob = new Blob([filedata], {
+                                type: "octet/stream"
+                            }),
+                            url = window.URL.createObjectURL(blob);
+                        document.getElementById('img').src = url
+                        //== Download file in browser
+                        // downloadFileFromBlob([filedata], data.name);
+
+                        deferred.resolve();
+                    });
+                }
+            });
+
+            //== Return
+            return deferred;
+        })
+
+
+        var downloadFileFromBlob = (function() {
+            var a = document.createElement("a");
+            document.body.appendChild(a);
+            a.style = "display: none";
+            return function(data, fileName) {
+                var blob = new Blob(data, {
+                        type: "octet/stream"
+                    }),
+                    url = window.URL.createObjectURL(blob);
+                a.href = url;
+                a.download = fileName;
+                a.click();
+                window.URL.revokeObjectURL(url);
+            };
+        }());
+
+        // ss(socket).on("image", function(stream, data) {
+        //     // alert("---- here image is -----------------", info);
+
+
+        //     //== Receive data
+        //     stream.on('data', function(chunk) {
+        //         fileLength += chunk.length;
+        //         var progress = Math.floor((fileLength / fileInfo.size) * 100);
+        //         progress = Math.max(progress - 2, 1);
+        //         deferred.notify(progress);
+        //         fileBuffer.push(chunk);
+        //     });
+
+        //     stream.on('end', function() {
+
+        //         var filedata = new Uint8Array(fileLength),
+        //             i = 0;
+
+        //         //== Loop to fill the final array
+        //         fileBuffer.forEach(function(buff) {
+        //             for (var j = 0; j < buff.length; j++) {
+        //                 filedata[i] = buff[j];
+        //                 i++;
+        //             }
+        //         });
+
+        //         // deferred.notify(100);
+
+        //         //== Download file in browser
+        //         alert(1);
+        //         // downloadFileFromBlob([filedata], originalFilename);
+
+        //         // deferred.resolve();
+        //     });
+
+
+
+
+        //     // document.getElementById('img').src = URL.createObjectURL(info);
+        //     // if (info.image) {
+        //     //    var src = 'data:image/jpeg;base64,' + info.buffer;
+        //     //    $('#theDiv').prepend('<img id="theImg" src='+src+ '/>')
+        //     // }
+        // });
+
+
+        //send file to server
+
+        $('#file').change(function(e) {
+            var file = e.target.files[0];
+            var stream = ss.createStream({
+                highWaterMark: 1,
+                objectMode: true,
+                allowHalfOpen: true
+            });
+
+            // upload a file to the server.
+            ss(socket).emit('file', stream,preMsg, {
+                size: file.size,
+                name: file.name
+            });
+            // alert(ss);
+            // ss.createBlobReadStream(file).pipe(stream);
+
+            var blobStream = ss.createBlobReadStream(file);
+            var size = 0;
+
+            blobStream.on('data', function(chunk) {
+                size += chunk.length;
+                console.log(Math.floor(size / file.size * 100) + '%');
+                document.getElementById('progress').innerHTML = Math.floor(size / file.size * 100) + '%';
+                document.getElementById('progress').style = "width:" + Math.floor(size / file.size * 100) + '%';
+                // -> e.g. '42%'
+            });
+
+            blobStream.pipe(stream);
+            blobStream.on('end', function() {
+                console.info('ending');
+            });
+
+            blobStream.on('finish', function() {
+                console.info('Finish !');
+            });
+
+            blobStream.on('error', function(err) {
+                console.error('error');
+            });
+
+            blobStream.on('pause', function() {
+                console.log('pause');
+            });
+        });
+
+    });
+    </script>
+</body>
+
+</html>
